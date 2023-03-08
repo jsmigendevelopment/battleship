@@ -1,9 +1,13 @@
 import PubSubInterface from "../../PubSubInterface";
 import elem from "../elem";
 import Ship from "./ShipElem";
-import { isValidPlacement, placeShip } from "../../gameComponents/Game";
+import {
+    checkAllShipsPlaced,
+    isValidPlacement,
+    placeShip,
+} from "../../gameComponents/Game";
 
-export default class BoardElem extends PubSubInterface {
+export default class playerBoardElem extends PubSubInterface {
     constructor(viewModel, element, dragEnter) {
         super(viewModel, element);
         this.dragEnter = dragEnter;
@@ -11,9 +15,7 @@ export default class BoardElem extends PubSubInterface {
     }
 
     render(model) {
-        if (model.gameState === "placeShips") {
-            return this.buildBoard(model);
-        }
+        return this.buildBoard(model);
     }
 
     buildBoard(model) {
@@ -72,7 +74,7 @@ export default class BoardElem extends PubSubInterface {
         }
         this.cells = cells;
 
-        model.player.gameboard.ships.forEach((ship) => {
+        model.player.gameboard.ships.forEach((ship, index) => {
             const shipElem = new Ship(ship, (clickedIndex) => {
                 // this.clickedEvent(index, clickedIndex);
             });
@@ -85,9 +87,19 @@ export default class BoardElem extends PubSubInterface {
             shipElem.tiles.forEach((tile) => {
                 tile.classList.add("onBoard");
             });
+
+            if (index === model.player.gameboard.ships.length - 1) {
+                shipElem.shipPulse.classList.add("shipOverlayPulse");
+                // setTimeout(() => {
+                //     shipElem.shipPulse.classList.remove("shipOverlayPulse");
+                // }, 2000);
+            }
             shadowGrid.appendChild(shipElem.element);
         });
-        return board;
+
+        const boardBorder = elem({ prop: "div", className: "boardBorder" });
+        boardBorder.appendChild(board);
+        return boardBorder;
     }
 
     handleDragOver(e) {
@@ -206,21 +218,30 @@ export default class BoardElem extends PubSubInterface {
                     baseCol,
                     oldModel.player.gameboard
                 );
-                // if (oldModel.player.shipQueue.length === 1) {
-                //     newModel.gameState = "inGame";
-                // }
+
                 newModel.player.gameboard = newGameboard;
                 newModel.player.shipQueue.shift();
                 if (newModel.player.shipQueue.length > 0) {
                     newModel.stateMessage = `Place your ${newModel.player.shipQueue[0].name}`;
                 }
-
                 newModel.player.gameboard.ships.push(newShip);
+
+                const allPlaced = checkAllShipsPlaced(newModel.player);
+
+                if (allPlaced) {
+                    newModel.allShipsPlaced = true;
+                    newModel.stateMessage = `Good luck Admiral ${newModel.player.name}`;
+                }
 
                 return newModel;
             });
         } else {
-            // TODO: handle invalid placement drop
+            // TODO: handle invalid placement drop\
+            this.viewModel.updateModel((oldModel) => {
+                const newModel = { ...oldModel };
+                newModel.stateMessage = `${newModel.player.shipQueue[0].name} went out of bounds, try again.`;
+                return newModel;
+            });
         }
     }
 
